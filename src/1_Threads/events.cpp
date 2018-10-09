@@ -2,9 +2,9 @@
 	. Used for signing
 */
 
-#include "precompiled.h"
-#include <memory>
-
+//#include "precompiled.h"
+//#include <memory>
+//
 //int main()
 //{
 //	auto e = event(event_type::manual_reset);

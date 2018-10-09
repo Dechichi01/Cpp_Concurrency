@@ -28,7 +28,9 @@
     <ClCompile Include="src\1_Threads\events_thread_sync.cpp" />
     <ClCompile Include="src\1_Threads\windows_threads.cpp" />
     <ClCompile Include="src\2_Synchronization\critical_sections.cpp" />
-    <ClCompile Include="src\precompiled.cpp" />
+    <ClCompile Include="src\2_Synchronization\keyed_events.cpp" />
+    <ClCompile Include="src\2_Synchronization\mutex.cpp" />
+    <ClCompile Include="src\2_Synchronization\rwsync.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

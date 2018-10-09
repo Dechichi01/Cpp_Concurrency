@@ -70,3 +70,118 @@ public:
 		return result == WAIT_OBJECT_0;
 	}
 };
+
+template<typename T>
+class auto_lock
+{
+	using UnlockAction = void (T::*)();
+	T& m_lock;
+	UnlockAction m_unlock_action;
+
+public:
+	explicit auto_lock(T& lock, UnlockAction action) noexcept
+		: m_lock(lock), m_unlock_action(action)
+	{
+	}
+
+	~auto_lock() noexcept
+	{
+		(m_lock.*m_unlock_action)();
+	}
+
+	/*auto_lock(const auto_lock&) = delete;
+	auto_lock& operator=(const auto_lock&) = delete;*/
+	/*auto_lock(auto_lock&&) = delete;
+	auto_lock& operator=(auto_lock&&) = delete;*/
+};
+
+class slim_lock
+{
+	SRWLOCK m_lock;
+
+public:
+	slim_lock() noexcept
+		: m_lock{}
+	{}
+
+	/*slim_lock(const slim_lock&) = delete;
+	slim_lock& operator=(const slim_lock&) = delete;*/
+	/*slim_lock(slim_lock&&) = delete;
+	slim_lock& operator=(slim_lock&&) = delete;*/
+
+	SRWLOCK* native_handle() noexcept
+	{
+		return &m_lock;
+	}
+
+	auto_lock<slim_lock> get_exclusive()
+	{
+		enter();
+		return auto_lock<slim_lock>{ *this, &slim_lock::exit };
+	}
+
+	auto_lock<slim_lock> get_shared()
+	{
+		enter_shared();
+		return auto_lock<slim_lock>{ *this, &slim_lock::exit_shared };
+	}
+
+private:
+	void enter() noexcept
+	{
+		AcquireSRWLockExclusive(&m_lock);
+	}
+
+	void exit() noexcept
+	{
+		ReleaseSRWLockExclusive(&m_lock);
+	}
+
+	void enter_shared() noexcept
+	{
+		AcquireSRWLockShared(&m_lock);
+	}
+
+	void exit_shared() noexcept
+	{
+		ReleaseSRWLockShared(&m_lock);
+	}
+};
+
+
+////
+
+void pick_and_add(HANDLE*) {}
+
+template<typename T, typename... Args>
+void pick_and_add(HANDLE* left, const T& right, const Args&... args)
+{
+	*left = right.get();
+	pick_and_add(++left, args...);
+}
+
+template<typename... Args>
+void wait_all(const DWORD milliseconds, const Args&... args)
+{
+	//sizeof is staticly evaluated
+	HANDLE handles[sizeof...(args)];
+	pick_and_add(handles, args...);
+
+	WaitForMultipleObjects(sizeof...(args), handles, true, milliseconds);
+}
+
+bool wait_one(const HANDLE h, const DWORD milliseconds = INFINITE)
+{
+	const DWORD result = WaitForSingleObject(h, milliseconds);
+	if (result == WAIT_OBJECT_0)
+	{
+		return true;
+	}
+	else if (result == WAIT_TIMEOUT)
+	{
+		return false;
+	}
+
+	throw windows_exception();
+}
+
