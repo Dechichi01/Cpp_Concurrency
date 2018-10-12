@@ -3,6 +3,9 @@
 #include "debug.h"
 #include "handle.h"
 #include <memory>
+#include <iostream>
+
+#define LOG(x) std::cout << x << std::endl
 
 struct windows_exception
 {
@@ -109,24 +112,6 @@ public:
 	/*slim_lock(slim_lock&&) = delete;
 	slim_lock& operator=(slim_lock&&) = delete;*/
 
-	SRWLOCK* native_handle() noexcept
-	{
-		return &m_lock;
-	}
-
-	auto_lock<slim_lock> get_exclusive()
-	{
-		enter();
-		return auto_lock<slim_lock>{ *this, &slim_lock::exit };
-	}
-
-	auto_lock<slim_lock> get_shared()
-	{
-		enter_shared();
-		return auto_lock<slim_lock>{ *this, &slim_lock::exit_shared };
-	}
-
-private:
 	void enter() noexcept
 	{
 		AcquireSRWLockExclusive(&m_lock);
@@ -146,6 +131,24 @@ private:
 	{
 		ReleaseSRWLockShared(&m_lock);
 	}
+
+	SRWLOCK* native_handle() noexcept
+	{
+		return &m_lock;
+	}
+
+	auto_lock<slim_lock> get_exclusive()
+	{
+		enter();
+		return auto_lock<slim_lock>{ *this, &slim_lock::exit };
+	}
+
+	auto_lock<slim_lock> get_shared()
+	{
+		enter_shared();
+		return auto_lock<slim_lock>{ *this, &slim_lock::exit_shared };
+	}
+
 };
 
 
@@ -185,3 +188,28 @@ bool wait_one(const HANDLE h, const DWORD milliseconds = INFINITE)
 	throw windows_exception();
 }
 
+
+using thread_callback = void(*)();
+
+DWORD __stdcall thread_wrapper(void * args)
+{
+	auto callback = static_cast<thread_callback>(args);
+
+	callback();
+
+	return 0;
+}
+
+template <typename F>
+KennyKerr::null_handle make_thread(F callback) throw()
+{
+	return KennyKerr::null_handle
+	{
+		CreateThread(nullptr,
+					 0,
+					 thread_wrapper,
+					 static_cast<thread_callback>(callback),
+					 0,
+					 nullptr)
+	};
+}
